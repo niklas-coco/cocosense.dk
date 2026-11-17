@@ -65,17 +65,17 @@ function curve(sc,g){var pts=[],r=[],off=0.18*(0.33+(sc-0.33)*g),a=sc*g;
   r.push([E,0.12*E-off-a*0.55*pk(E,0.20,0.20,0.08)]);}
  return [pts,r];}
 function ease(t){t=Math.max(0,Math.min(1,t));return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;}
-var W,H,dpr;
+var W,H,dpr,FIT=0.92,OFFY=0,MEASURE=null;
 function size(){dpr=Math.min(window.devicePixelRatio||1,2);var b=cv.getBoundingClientRect();W=b.width;H=b.height;cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);}
 function draw(g,d,ry,rx){
  ctx.clearRect(0,0,W,H);
- var s=Math.min(W/1.6,H/2.2)*(1-0.08*d)*(W<500?1.12:1), cx=W/2-W*0.05*d, cy=H/2-H*0.04*d, f=3.2;
+ var s=Math.min(W/1.6,H/2.2)*(1-(1-FIT)*d)*(W<500?1.12:1), cx=W/2-W*0.05*d, cy=H/2+OFFY*d, f=3.2;
  var cyw=Math.cos(ry),syw=Math.sin(ry),cxw=Math.cos(rx),sxw=Math.sin(rx);
  var n=SC.length, span=(n-1)*0.30*d;
  function proj(x,y,z){var x1=x*cyw+z*syw, z1=-x*syw+z*cyw; var y2=y*cxw-z1*sxw, z2=y*sxw+z1*cxw; var pp=f/(f+z2); return [cx+x1*s*pp, cy-y2*s*pp];}
  function slice(sc,z){var B=curve(sc,g*(1+0.05*d*Math.sin(TT*0.8-z*5))),O=[];for(var b=0;b<2;b++){var Q=[];for(var i=0;i<B[b].length;i++)Q.push(proj(B[b][i][0]-0.25,B[b][i][1]-0.05,z));O.push(Q);}return O;}
- function line(Q){ctx.beginPath();ctx.moveTo(Q[0][0],Q[0][1]);for(var i=1;i<Q.length;i++)ctx.lineTo(Q[i][0],Q[i][1]);ctx.stroke();}
- if(d>0.01){
+ function line(Q){if(MEASURE){for(var i=0;i<Q.length;i++){MEASURE[0]=Math.min(MEASURE[0],Q[i][1]);MEASURE[1]=Math.max(MEASURE[1],Q[i][1]);MEASURE[2]=Math.min(MEASURE[2],Q[i][0]);MEASURE[3]=Math.max(MEASURE[3],Q[i][0]);}return;}ctx.beginPath();ctx.moveTo(Q[0][0],Q[0][1]);for(var i=1;i<Q.length;i++)ctx.lineTo(Q[i][0],Q[i][1]);ctx.stroke();}
+ if(d>0.01&&!MEASURE){
   var c0=proj(0.02,-0.98,0), rw=s*0.9*d, rh=s*0.16*d;
   ctx.save(); ctx.translate(c0[0],c0[1]); ctx.scale(1,rh/rw);
   var gr=ctx.createRadialGradient(0,0,0,0,0,rw); gr.addColorStop(0,'rgba(28,35,43,'+(0.10*d)+')'); gr.addColorStop(1,'rgba(28,35,43,0)');
@@ -94,6 +94,16 @@ function draw(g,d,ry,rx){
  }
 }
 var t0=null, RY=-0.45, RX=0.18, TT=0;
+function fit(){
+ FIT=1;OFFY=0; var top=Infinity,bot=-Infinity,lft=Infinity,rgt=-Infinity;
+ for(var k=0;k<8;k++){TT=k*0.6; MEASURE=[Infinity,-Infinity,Infinity,-Infinity]; draw(1,1,RY+0.03*(k%2?1:-1),RX);
+  top=Math.min(top,MEASURE[0]);bot=Math.max(bot,MEASURE[1]);lft=Math.min(lft,MEASURE[2]);rgt=Math.max(rgt,MEASURE[3]);}
+ MEASURE=null;
+ var shadow=0.18, h=(bot-top)*(1+shadow), w=rgt-lft, m=0.92;
+ var k2=Math.min(1, m*H/h, m*W/w); FIT=k2;
+ OFFY=(H/2-(top+(bot-top)*(1+shadow)/2))*k2;
+ TT=0;
+}
 var last=null,tt=0,raf=0,onScreen=true;
 function frame(ts){
  if(last!==null) tt+=Math.min(ts-last,50)/1000; last=ts; var t=tt;
@@ -104,7 +114,7 @@ function frame(ts){
 }
 function run(){var go=onScreen&&!document.hidden&&!reduce;
  if(go&&!raf){last=null;raf=requestAnimationFrame(frame);} else if(!go&&raf){cancelAnimationFrame(raf);raf=0;}}
-size(); window.addEventListener('resize',function(){size(); if(reduce) draw(1,1,RY,RX);});
+size(); fit(); window.addEventListener('resize',function(){size(); fit(); if(reduce) draw(1,1,RY,RX);});
 if(reduce){draw(1,1,RY,RX);} else {
  if('IntersectionObserver' in window) new IntersectionObserver(function(en){onScreen=en[0].isIntersecting;run();}).observe(cv);
  document.addEventListener('visibilitychange',run); run();
